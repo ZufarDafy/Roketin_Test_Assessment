@@ -5,26 +5,42 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
 
-	"minishop/internal/config"
 	"minishop/internal/database"
 	"minishop/internal/models"
 	"minishop/internal/router"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
 
-// Integration test — butuh PostgreSQL berjalan (docker compose up -d).
-// Otomatis skip bila database tidak tersedia.
+// init memuat backend/.env sebagai sumber TEST_DB_DSN.
+func init() {
+	if _, file, _, ok := runtime.Caller(0); ok {
+		_ = godotenv.Load(filepath.Join(filepath.Dir(file), "..", "..", ".env"))
+	}
+}
+
+// Integration test — butuh PostgreSQL berjalan (docker compose up -d)
+// dan TEST_DB_DSN diset (via shell atau backend/.env). Test tidak
+// memakai config.Load() agar tidak terikat konfigurasi server.
 func setup(t *testing.T) (*gorm.DB, *gin.Engine) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 
-	db, err := database.Connect(config.Load().DBDSN)
+	dsn := os.Getenv("TEST_DB_DSN")
+	if dsn == "" {
+		t.Skip("TEST_DB_DSN is not set; skipping integration test")
+	}
+
+	db, err := database.Connect(dsn)
 	if err != nil {
 		t.Skipf("database not available, skipping integration test: %v", err)
 	}
