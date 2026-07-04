@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type ProductHandler struct {
@@ -114,12 +115,36 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		return
 	}
 
-	product.Name = input.Name
-	product.Price = input.Price
-	product.Description = input.Description
-	product.ImageURL = input.ImageURL
-	product.Stock = *input.Stock
-	product.CategoryID = input.CategoryID
+	var notFound bool
+	txErr := h.DB.Transaction(func(tx *gorm.DB) error {
+		var product models.Product
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&product, byID, c.Param("id")).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				notFound = true
+			}
+			return err
+		}
+
+		product.Name = input.Name
+		product.Price = *input.Price
+		product.Description = input.Description
+		product.ImageURL = input.ImageURL
+		product.CategoryID = input.CategoryID
+		if input.Stock != nil {
+			product.Stock = *input.Stock
+		}
+		return tx.Save(&product).Error
+	})
+
+	if txErr != nil {
+		if notFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": msgNotFound})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update product"})
+		return
+	}
 	h.respondWithProduct(c, http.StatusOK, c.Param("id"))
 }
 

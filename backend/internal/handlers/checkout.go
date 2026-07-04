@@ -36,15 +36,19 @@ type stockError struct {
 var errStock = errors.New("insufficient stock")
 var errNotFound = errors.New("product not found")
 
+// checkoutState menampung hasil antara selama transaction berlangsung.
+type checkoutState struct {
+	order       models.Order
+	stockErrors []stockError
+	missingID   uint
+}
+
 // Checkout membuat Order dalam satu transaction:
 //  1. Setiap produk dikunci dengan SELECT ... FOR UPDATE agar dua checkout
 //     bersamaan tidak bisa sama-sama lolos validasi stok (race condition).
 //  2. Stok divalidasi ulang di dalam transaction — validasi di frontend
 //     hanya untuk UX, sumber kebenaran ada di sini.
 //  3. Total dihitung dari harga di database, bukan dari client.
-//
-// Produk diproses berurutan berdasarkan product_id agar dua transaksi yang
-// saling menunggu lock tidak deadlock.
 func (h *CheckoutHandler) Checkout(c *gin.Context) {
 	var input checkoutInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -52,83 +56,96 @@ func (h *CheckoutHandler) Checkout(c *gin.Context) {
 		return
 	}
 
-	// Gabungkan qty untuk product_id duplikat, lalu urutkan.
-	qtyByProduct := map[uint]int{}
-	for _, item := range input.Items {
-		qtyByProduct[item.ProductID] += item.Qty
-	}
-	productIDs := make([]uint, 0, len(qtyByProduct))
-	for id := range qtyByProduct {
-		productIDs = append(productIDs, id)
-	}
-	sort.Slice(productIDs, func(i, j int) bool { return productIDs[i] < productIDs[j] })
+	qtyByProduct, productIDs := normalizeItems(input.Items)
 
-	var order models.Order
-	var stockErrors []stockError
-	var missingID uint
-
+	var state checkoutState
 	txErr := h.DB.Transaction(func(tx *gorm.DB) error {
-		var items []models.OrderItem
-		var total float64
-
-		for _, id := range productIDs {
-			qty := qtyByProduct[id]
-
-			var product models.Product
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-				First(&product, "id = ?", id).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					missingID = id
-					return errNotFound
-				}
-				return err
-			}
-
-			if qty > product.Stock {
-				stockErrors = append(stockErrors, stockError{
-					ProductID: product.ID,
-					Name:      product.Name,
-					Requested: qty,
-					Available: product.Stock,
-				})
-				continue
-			}
-
-			if err := tx.Model(&models.Product{}).Where("id = ?", product.ID).
-				Update("stock", gorm.Expr("stock - ?", qty)).Error; err != nil {
-				return err
-			}
-
-			subtotal := product.Price * float64(qty)
-			total += subtotal
-			items = append(items, models.OrderItem{
-				ProductID:   product.ID,
-				ProductName: product.Name,
-				Price:       product.Price,
-				Qty:         qty,
-				Subtotal:    subtotal,
-			})
-		}
-
-		if len(stockErrors) > 0 {
-			return errStock
-		}
-
-		order = models.Order{Total: total, Items: items}
-		return tx.Create(&order).Error
+		return state.process(tx, productIDs, qtyByProduct)
 	})
 
 	switch {
 	case txErr == nil:
-		c.JSON(http.StatusCreated, gin.H{"data": order})
+		c.JSON(http.StatusCreated, gin.H{"data": state.order})
 	case errors.Is(txErr, errStock):
 		c.JSON(http.StatusUnprocessableEntity, gin.H{
-			"error":       "insufficient stock for some items",
-			"stock_errors": stockErrors,
+			"error":        "insufficient stock for some items",
+			"stock_errors": state.stockErrors,
 		})
 	case errors.Is(txErr, errNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("product %d not found", missingID)})
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("product %d not found", state.missingID)})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "checkout failed"})
 	}
+}
+
+// normalizeItems menggabungkan qty untuk product_id duplikat dan
+// mengurutkan id — pemrosesan terurut mencegah deadlock antar dua
+// transaksi yang saling menunggu lock produk yang sama.
+func normalizeItems(items []checkoutItem) (map[uint]int, []uint) {
+	qtyByProduct := map[uint]int{}
+	for _, item := range items {
+		qtyByProduct[item.ProductID] += item.Qty
+	}
+	ids := make([]uint, 0, len(qtyByProduct))
+	for id := range qtyByProduct {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return qtyByProduct, ids
+}
+
+func (s *checkoutState) process(tx *gorm.DB, productIDs []uint, qtyByProduct map[uint]int) error {
+	var items []models.OrderItem
+	var total int64
+
+	for _, id := range productIDs {
+		qty := qtyByProduct[id]
+
+		product, err := lockProduct(tx, id)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				s.missingID = id
+				return errNotFound
+			}
+			return err
+		}
+
+		if qty > product.Stock {
+			s.stockErrors = append(s.stockErrors, stockError{
+				ProductID: product.ID,
+				Name:      product.Name,
+				Requested: qty,
+				Available: product.Stock,
+			})
+			continue
+		}
+
+		if err := tx.Model(&models.Product{}).Where(byID, product.ID).
+			Update("stock", gorm.Expr("stock - ?", qty)).Error; err != nil {
+			return err
+		}
+
+		subtotal := product.Price * int64(qty)
+		total += subtotal
+		items = append(items, models.OrderItem{
+			ProductID:   product.ID,
+			ProductName: product.Name,
+			Price:       product.Price,
+			Qty:         qty,
+			Subtotal:    subtotal,
+		})
+	}
+
+	if len(s.stockErrors) > 0 {
+		return errStock
+	}
+
+	s.order = models.Order{Total: total, Items: items}
+	return tx.Create(&s.order).Error
+}
+
+func lockProduct(tx *gorm.DB, id uint) (models.Product, error) {
+	var product models.Product
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, byID, id).Error
+	return product, err
 }
