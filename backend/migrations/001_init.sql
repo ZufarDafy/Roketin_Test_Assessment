@@ -8,13 +8,17 @@ CREATE TABLE categories (
     name TEXT NOT NULL UNIQUE
 );
 
+-- Harga sebagai BIGINT rupiah utuh (IDR tidak punya sen) — menghindari
+-- drift presisi floating point pada kalkulasi total.
+-- CHECK constraint menegakkan invariant di level DB sebagai
+-- defense-in-depth, tidak hanya mengandalkan disiplin kode aplikasi.
 CREATE TABLE products (
     id          BIGSERIAL PRIMARY KEY,
     name        TEXT NOT NULL,
-    price       NUMERIC(14,2) NOT NULL,
+    price       BIGINT NOT NULL CHECK (price >= 0),
     description TEXT,
     image_url   TEXT,
-    stock       BIGINT NOT NULL DEFAULT 0,
+    stock       BIGINT NOT NULL DEFAULT 0 CHECK (stock >= 0),
     category_id BIGINT NOT NULL REFERENCES categories(id),
     created_at  TIMESTAMPTZ,
     updated_at  TIMESTAMPTZ
@@ -22,7 +26,7 @@ CREATE TABLE products (
 
 CREATE TABLE orders (
     id         BIGSERIAL PRIMARY KEY,
-    total      NUMERIC(14,2) NOT NULL,
+    total      BIGINT NOT NULL,
     created_at TIMESTAMPTZ
 );
 
@@ -33,9 +37,9 @@ CREATE TABLE order_items (
     order_id     BIGINT NOT NULL REFERENCES orders(id),
     product_id   BIGINT,
     product_name TEXT NOT NULL,
-    price        NUMERIC(14,2) NOT NULL,
+    price        BIGINT NOT NULL,
     qty          BIGINT NOT NULL,
-    subtotal     NUMERIC(14,2) NOT NULL
+    subtotal     BIGINT NOT NULL
 );
 
 CREATE INDEX idx_order_items_order_id ON order_items (order_id);
