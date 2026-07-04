@@ -1,22 +1,44 @@
 package config
 
-import "os"
+import (
+	"log"
+	"os"
+	"strings"
+
+	"github.com/joho/godotenv"
+)
 
 type Config struct {
-	DBDSN string
-	Port  string
+	DBDSN          string
+	Port           string
+	AllowedOrigins []string
 }
 
 func Load() Config {
+	_ = godotenv.Load()
+
 	return Config{
-		DBDSN: getEnv("DB_DSN", "host=localhost user=minishop password=minishop dbname=minishop port=5432 sslmode=disable"),
-		Port:  getEnv("PORT", "8080"),
+		DBDSN:          mustGetEnv("DB_DSN"),
+		Port:           mustGetEnv("PORT"),
+		AllowedOrigins: splitCSV(mustGetEnv("ALLOWED_ORIGINS")),
 	}
 }
 
-func getEnv(key, fallback string) string {
+func mustGetEnv(key string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
-	return fallback
+	log.Fatalf("config: required env var %s is not set", key)
+	return ""
+}
+
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }

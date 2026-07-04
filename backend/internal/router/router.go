@@ -10,11 +10,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func New(db *gorm.DB) *gin.Engine {
+const productByID = "/products/:id"
+
+func New(db *gorm.DB, allowedOrigins []string) *gin.Engine {
 	r := gin.Default()
+	r.SetTrustedProxies(nil)
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
 		MaxAge:           12 * time.Hour,
@@ -29,10 +32,10 @@ func New(db *gorm.DB) *gin.Engine {
 	api := r.Group("/api")
 	{
 		api.GET("/products", product.List)
-		api.GET("/products/:id", product.Get)
+		api.GET(productByID, product.Get)
 		api.POST("/products", product.Create)
-		api.PUT("/products/:id", product.Update)
-		api.DELETE("/products/:id", product.Delete)
+		api.PUT(productByID, product.Update)
+		api.DELETE(productByID, product.Delete)
 
 		api.GET("/categories", category.List)
 
