@@ -64,6 +64,8 @@ Konfigurasi backend **wajib** via env — tidak ada nilai default di kode: copy 
 
 Seeder otomatis mengisi **4 kategori + 50 produk dummy** saat tabel products kosong — sengaja lebih dari cukup (requirement minimal 5–10) supaya pagination (default `page_size=20`, jadi 3 halaman) langsung terlihat berfungsi tanpa perlu menambah produk manual.
 
+Lokasi Seeder : backend\migrations\001_init.sql
+
 ### Menjalankan test
 
 Integration test checkout butuh PostgreSQL jalan dan `TEST_DB_DSN` — dibaca dari `backend/.env` (sudah ada di `.env.example`) atau dari env shell/CI (yang menang bila keduanya diset). Tanpa `TEST_DB_DSN`, test di-skip dengan pesan jelas.
