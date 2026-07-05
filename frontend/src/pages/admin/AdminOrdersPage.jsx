@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../api/client";
 import AdminNav from "../../components/AdminNav";
+import Pagination from "../../components/Pagination";
 import { formatIDR } from "../../utils/format";
 
 export default function AdminOrdersPage() {
@@ -8,14 +9,20 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [openId, setOpenId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
+    setLoading(true);
     api
-      .get("/orders")
-      .then((res) => setOrders(res.data.data ?? []))
+      .get("/orders", { params: { page } })
+      .then((res) => {
+        setOrders(res.data.data ?? []);
+        setTotalPages(res.data.meta?.total_pages ?? 1);
+      })
       .catch(() => setError("Gagal memuat orders."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [page]);
 
   if (loading) return <p className="state">Memuat...</p>;
   if (error) return <p className="state state--error">{error}</p>;
@@ -50,6 +57,8 @@ export default function AdminOrdersPage() {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} totalPages={totalPages} onChange={setPage} />
     </section>
   );
 }

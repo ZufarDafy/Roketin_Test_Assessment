@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import api from "../../api/client";
 import AdminNav from "../../components/AdminNav";
 import ProductFormModal from "../../components/ProductFormModal";
+import Pagination from "../../components/Pagination";
 import { formatIDR } from "../../utils/format";
 
 export default function AdminProductsPage() {
@@ -11,15 +12,20 @@ export default function AdminProductsPage() {
   const [error, setError] = useState("");
   // modal: null = tertutup, "new" = tambah, object = edit produk tsb
   const [modal, setModal] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const fetchProducts = useCallback(() => {
     setLoading(true);
     api
-      .get("/products")
-      .then((res) => setProducts(res.data.data ?? []))
+      .get("/products", { params: { page } })
+      .then((res) => {
+        setProducts(res.data.data ?? []);
+        setTotalPages(res.data.meta?.total_pages ?? 1);
+      })
       .catch(() => setError("Gagal memuat produk."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     fetchProducts();
@@ -96,6 +102,8 @@ export default function AdminProductsPage() {
           </table>
         </div>
       )}
+
+      <Pagination page={page} totalPages={totalPages} onChange={setPage} />
 
       {modal !== null && (
         <ProductFormModal

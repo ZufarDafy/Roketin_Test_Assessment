@@ -3,6 +3,7 @@ import api from "../api/client";
 import useDebounce from "../hooks/useDebounce";
 import ProductCard from "../components/ProductCard";
 import ProductModal from "../components/ProductModal";
+import Pagination from "../components/Pagination";
 
 // Selaras dengan backend (lihat minSearchLen di product.go): pg_trgm
 // membentuk trigram dari pecahan 3 karakter, jadi search < 3 karakter
@@ -17,6 +18,8 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const debouncedSearch = useDebounce(search);
   const trimmedSearch = debouncedSearch.trim();
@@ -32,6 +35,12 @@ export default function CatalogPage() {
       .catch(() => {});
   }, []);
 
+  // Filter berubah -> selalu mulai lagi dari halaman 1 (halaman lama bisa
+  // out-of-range untuk filter yang baru).
+  useEffect(() => {
+    setPage(1);
+  }, [trimmedSearch, categoryId]);
+
   useEffect(() => {
     // Flag "active" mencegah request lama yang di-abort menimpa state
     // request baru (finally-nya baru jalan setelah effect berikutnya).
@@ -45,12 +54,14 @@ export default function CatalogPage() {
         params: {
           search: trimmedSearch.length >= MIN_SEARCH_LEN ? trimmedSearch : undefined,
           category_id: categoryId || undefined,
+          page,
         },
         signal: controller.signal,
       })
       .then((res) => {
         if (!active) return;
         setProducts(res.data.data ?? []);
+        setTotalPages(res.data.meta?.total_pages ?? 1);
       })
       .catch(() => {
         if (!active) return;
@@ -64,7 +75,7 @@ export default function CatalogPage() {
       active = false;
       controller.abort();
     };
-  }, [trimmedSearch, categoryId]);
+  }, [trimmedSearch, categoryId, page]);
 
   return (
     <>
@@ -106,6 +117,8 @@ export default function CatalogPage() {
           <ProductCard key={p.id} product={p} onSelect={setSelected} />
         ))}
       </div>
+
+      <Pagination page={page} totalPages={totalPages} onChange={setPage} />
 
       <ProductModal product={selected} onClose={() => setSelected(null)} />
     </>
