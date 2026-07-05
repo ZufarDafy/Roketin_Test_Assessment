@@ -1,7 +1,14 @@
+import { useCart } from "../context/CartContext";
 import { formatIDR } from "../utils/format";
 
 export default function ProductCard({ product, onSelect }) {
+  const { addItem } = useCart();
   const outOfStock = product.stock <= 0;
+
+  const handleAdd = (e) => {
+    e.stopPropagation();
+    addItem(product, 1);
+  };
 
   return (
     <article className="product-card" onClick={() => onSelect(product)}>
@@ -17,6 +24,9 @@ export default function ProductCard({ product, onSelect }) {
           <strong>{formatIDR(product.price)}</strong>
           <span className="product-card__stock">Stok: {product.stock}</span>
         </div>
+        <button className="btn btn--primary btn--small" onClick={handleAdd} disabled={outOfStock}>
+          + Keranjang
+        </button>
       </div>
     </article>
   );
