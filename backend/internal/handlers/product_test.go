@@ -102,7 +102,11 @@ func TestProductListShortSearchIgnoresFilter(t *testing.T) {
 	target := fixture(t, db, 10, 10000, "target")
 	other := fixture(t, db, 10, 10000, "other")
 
-	w := getProducts(r, "search=zz")
+	// page_size=100 (maksimum) sengaja dipakai supaya assertion ini tidak
+	// bergantung pada halaman pertama default (20) memuat seluruh produk —
+	// jumlah data seed bisa bertambah seiring waktu, tapi produk fixture
+	// (id di ujung karena dibuat belakangan) harus tetap tercakup.
+	w := getProducts(r, "search=zz&page_size=100")
 	if w.Code != http.StatusOK {
 		t.Fatalf("want 200, got %d: %s", w.Code, w.Body.String())
 	}
