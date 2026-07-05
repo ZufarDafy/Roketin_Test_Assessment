@@ -51,15 +51,23 @@ func setup(t *testing.T) (*gorm.DB, *gin.Engine) {
 }
 
 // fixture membuat kategori + produk uji dan mendaftarkan pembersihannya.
-func fixture(t *testing.T, db *gorm.DB, stock int, price int64) models.Product {
+// label opsional membedakan beberapa fixture dalam satu test yang sama
+// (t.Name() identik untuk semua pemanggilan di test yang sama, jadi tanpa
+// label dua fixture akan tabrakan pada unique index nama kategori).
+func fixture(t *testing.T, db *gorm.DB, stock int, price int64, label ...string) models.Product {
 	t.Helper()
 
-	category := models.Category{Name: fmt.Sprintf("TEST-cat-%s", t.Name())}
+	suffix := t.Name()
+	if len(label) > 0 {
+		suffix = suffix + "-" + label[0]
+	}
+
+	category := models.Category{Name: fmt.Sprintf("TEST-cat-%s", suffix)}
 	if err := db.Create(&category).Error; err != nil {
 		t.Fatalf("create category: %v", err)
 	}
 	product := models.Product{
-		Name:       fmt.Sprintf("TEST-product-%s", t.Name()),
+		Name:       fmt.Sprintf("TEST-product-%s", suffix),
 		Price:      price,
 		Stock:      stock,
 		CategoryID: category.ID,

@@ -4,6 +4,11 @@ import useDebounce from "../hooks/useDebounce";
 import ProductCard from "../components/ProductCard";
 import ProductModal from "../components/ProductModal";
 
+// Selaras dengan backend (lihat minSearchLen di product.go): pg_trgm
+// membentuk trigram dari pecahan 3 karakter, jadi search < 3 karakter
+// tidak bisa memanfaatkan index dan sengaja tidak dikirim ke server.
+const MIN_SEARCH_LEN = 3;
+
 export default function CatalogPage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -14,6 +19,11 @@ export default function CatalogPage() {
   const [selected, setSelected] = useState(null);
 
   const debouncedSearch = useDebounce(search);
+  const trimmedSearch = debouncedSearch.trim();
+  // Hint dihitung dari input mentah (bukan debouncedSearch) supaya
+  // muncul instan saat mengetik, terlepas dari jeda debounce request.
+  const trimmedInput = search.trim();
+  const isSearchTooShort = trimmedInput.length > 0 && trimmedInput.length < MIN_SEARCH_LEN;
 
   useEffect(() => {
     api
@@ -33,7 +43,7 @@ export default function CatalogPage() {
     api
       .get("/products", {
         params: {
-          search: debouncedSearch || undefined,
+          search: trimmedSearch.length >= MIN_SEARCH_LEN ? trimmedSearch : undefined,
           category_id: categoryId || undefined,
         },
         signal: controller.signal,
@@ -54,18 +64,23 @@ export default function CatalogPage() {
       active = false;
       controller.abort();
     };
-  }, [debouncedSearch, categoryId]);
+  }, [trimmedSearch, categoryId]);
 
   return (
     <>
       <div className="toolbar">
-        <input
-          type="search"
-          className="input"
-          placeholder="Cari produk..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="toolbar__search">
+          <input
+            type="search"
+            className="input"
+            placeholder="Cari produk..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {isSearchTooShort && (
+            <p className="search-hint">Ketik minimal 3 huruf untuk mencari</p>
+          )}
+        </div>
         <select
           className="input"
           value={categoryId}

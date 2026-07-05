@@ -85,9 +85,19 @@ body {
   color: var(--text);
 }
 
-.toolbar input[type="search"] {
+.toolbar__search {
   flex: 1;
   min-width: 200px;
+}
+
+.toolbar__search .input {
+  width: 100%;
+}
+
+.search-hint {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
 
 .input:focus {
