@@ -45,6 +45,12 @@ const (
 	byID           = "id = ?"
 	msgNotFound    = "product not found"
 	msgFetchFailed = "failed to fetch product"
+
+	// minSearchLen: pg_trgm membentuk trigram dari pecahan 3 karakter
+	// di bawah itu GIN trigram index tidak bisa dipakai
+	// planner secara efektif. Search =< 3 karakter diperlakukan seperti
+	// tidak ada filter search sama sekali (bukan error).
+	minSearchLen = 3
 )
 
 // List menangani search nama (ILIKE, didukung GIN trigram index) dan
@@ -52,7 +58,7 @@ const (
 func (h *ProductHandler) List(c *gin.Context) {
 	q := h.DB.Preload("Category").Order("id")
 
-	if search := c.Query("search"); search != "" {
+	if search := strings.TrimSpace(c.Query("search")); len(search) >= minSearchLen {
 		q = q.Where("name ILIKE ?", "%"+escapeLike.Replace(search)+"%")
 	}
 	if categoryID := c.Query("category_id"); categoryID != "" {
