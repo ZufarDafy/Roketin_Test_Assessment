@@ -15,12 +15,19 @@ type OrderHandler struct {
 }
 
 func (h *OrderHandler) List(c *gin.Context) {
-	var orders []models.Order
-	if err := h.DB.Preload("Items").Order("id DESC").Find(&orders).Error; err != nil {
+	var total int64
+	if err := h.DB.Model(&models.Order{}).Count(&total).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch orders"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": orders})
+	page, pageSize, offset := parsePagination(c)
+
+	var orders []models.Order
+	if err := h.DB.Preload("Items").Order("id DESC").Limit(pageSize).Offset(offset).Find(&orders).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch orders"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": orders, "meta": buildPaginationMeta(page, pageSize, total)})
 }
 
 func (h *OrderHandler) Get(c *gin.Context) {
