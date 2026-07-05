@@ -2,7 +2,7 @@
 
 ## Tools
 
-- **Claude Code** (Anthropic) dengan model Claude Fable 5 — dipakai sebagai pair programmer: menyusun rencana, menulis boilerplate, dan mengeksekusi smoke test. Keputusan arsitektur (pemilihan stack, strategi indexing trigram, desain checkout) ditentukan dan direview oleh saya.
+- **Claude Code** (Anthropic) dengan model Claude Fable 5 — dipakai sebagai pair programmer: menyusun rencana, menulis boilerplate, dan mengeksekusi smoke test. **Keputusan arsitektur (pemilihan stack, strategi indexing trigram, desain checkout) ditentukan dan direview oleh saya.**
 
 ## Contoh Prompt untuk Bagian Krusial
 
