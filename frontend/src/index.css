@@ -486,6 +486,19 @@ body {
   color: #991b1b;
 }
 
+.alert--info {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  position: relative;
+}
+
+.alert--info .btn-icon {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+}
+
 .alert ul {
   margin: 8px 0 0;
   padding-left: 18px;

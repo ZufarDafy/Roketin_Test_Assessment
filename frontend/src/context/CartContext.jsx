@@ -71,6 +71,23 @@ export function CartProvider({ children }) {
     );
   };
 
+  // Dipanggil saat halaman cart dibuka: menyinkronkan snapshot harga & stok
+  // dengan data server terkini. freshById memetakan product id -> {price,
+  // stock} (produk masih ada) atau null (produk sudah dihapus). Item
+  // dengan stok kini 0 atau produk yang sudah dihapus disingkirkan.
+  const applyServerSnapshot = (freshById) => {
+    setItems((prev) =>
+      prev
+        .map((it) => {
+          const fresh = freshById[it.id];
+          if (fresh === undefined) return it; // tidak berhasil dicek (mis. gagal jaringan)
+          if (fresh === null || fresh.stock <= 0) return { ...it, qty: 0 };
+          return { ...it, price: fresh.price, stock: fresh.stock, qty: Math.min(it.qty, fresh.stock) };
+        })
+        .filter((it) => it.qty > 0)
+    );
+  };
+
   const removeItem = (productId) =>
     setItems((prev) => prev.filter((it) => it.id !== productId));
 
@@ -88,6 +105,7 @@ export function CartProvider({ children }) {
       removeItem,
       clearCart,
       applyStockErrors,
+      applyServerSnapshot,
     };
   }, [items]);
 
