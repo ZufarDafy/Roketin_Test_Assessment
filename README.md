@@ -50,12 +50,12 @@ Prasyarat: Go 1.22+, Node 18+, Docker.
 docker compose up -d
 
 # 2. Backend (port 8080) — migrasi + seeder otomatis saat start
-cd backend
+cd backend   # pastikan posisi berada di main directory project
 cp .env.example .env   # Windows (cmd): copy .env.example .env
 go run ./cmd/server
 
 # 3. Frontend (port 5173)
-cd frontend
+cd frontend   # pastikan posisi berada di main directory project
 npm install
 npm run dev
 ```
