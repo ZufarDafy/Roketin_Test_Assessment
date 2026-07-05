@@ -23,6 +23,9 @@ export default function CatalogPage() {
   }, []);
 
   useEffect(() => {
+    // Flag "active" mencegah request lama yang di-abort menimpa state
+    // request baru (finally-nya baru jalan setelah effect berikutnya).
+    let active = true;
     const controller = new AbortController();
     setLoading(true);
     setError("");
@@ -35,15 +38,22 @@ export default function CatalogPage() {
         },
         signal: controller.signal,
       })
-      .then((res) => setProducts(res.data.data ?? []))
-      .catch((err) => {
-        if (err.code !== "ERR_CANCELED") {
-          setError("Gagal memuat produk. Pastikan backend berjalan.");
-        }
+      .then((res) => {
+        if (!active) return;
+        setProducts(res.data.data ?? []);
       })
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!active) return;
+        setError("Gagal memuat produk. Pastikan backend berjalan.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-    return () => controller.abort();
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [debouncedSearch, categoryId]);
 
   return (
