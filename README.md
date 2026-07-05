@@ -243,3 +243,4 @@ Request:
 - Belum ada autentikasi — halaman admin (`/admin/products`, `/admin/orders`) terbuka tanpa login (di luar scope requirement).
 - Kategori hanya bisa dibaca (`GET /categories`) — tidak ada CRUD kategori, seeder yang mengisi.
 - Snapshot cart disinkronkan saat halaman dibuka dan saat checkout ditolak (lihat "Sinkronisasi cart saat dibuka" di atas), tapi masih ada celah kecil yang inheren: perubahan harga/stok yang terjadi tepat di antara halaman dibuka dan tombol checkout ditekan baru terlihat setelah request checkout dikirim (ditangani via 422 + auto-sync ulang, bukan silent).
+- Tampilan admin (`/admin/products`, `/admin/orders`) kurang optimal di layar mobile sempit tabel tetap bisa di-scroll horizontal, tapi kolom aksi (tombol Edit/Hapus, Detail) sering terpotong di luar viewport. Katalog & cart sudah responsive penuh; ini spesifik ke tabel admin, namun secara fungsional masih diguankan secara baik.
