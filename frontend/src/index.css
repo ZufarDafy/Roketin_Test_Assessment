@@ -563,6 +563,20 @@ body {
   background: var(--bg);
 }
 
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.pagination__info {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
 /* Page head & admin tabs */
 .page-head {
   display: flex;

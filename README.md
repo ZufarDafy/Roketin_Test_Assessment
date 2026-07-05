@@ -71,7 +71,7 @@ cd backend
 go test ./... -v
 ```
 
-Mencakup: checkout sukses (penggabungan qty duplikat, total server-side, stok berkurang), stok tidak cukup (422 + detail per item, stok utuh), produk tidak ditemukan (404), dan **race test** dua checkout konkuren tanpa oversell.
+Mencakup: checkout sukses (penggabungan qty duplikat, total server-side, stok berkurang), stok tidak cukup (422 + detail per item, stok utuh), produk tidak ditemukan (404), **race test** dua checkout konkuren tanpa oversell, search minimal 3 karakter, dan pagination (default, penjelajahan seluruh halaman tanpa duplikat, page_size dipangkas ke maksimum, page tidak valid jatuh ke halaman 1).
 
 ## Endpoint API
 
@@ -79,15 +79,26 @@ Base URL: `http://localhost:8080/api`
 
 | Method | Path | Deskripsi |
 |---|---|---|
-| GET | `/products?search=&category_id=` | List produk, search nama, filter kategori |
+| GET | `/products?search=&category_id=&page=&page_size=` | List produk (paginated), search nama, filter kategori |
 | GET | `/products/:id` | Detail produk |
 | POST | `/products` | Tambah produk |
 | PUT | `/products/:id` | Edit produk (`stock` opsional — tidak dikirim = tidak diubah) |
 | DELETE | `/products/:id` | Hapus produk |
 | GET | `/categories` | List kategori |
 | POST | `/checkout` | Buat order, kurangi stok |
-| GET | `/orders` | List order |
+| GET | `/orders?page=&page_size=` | List order (paginated) |
 | GET | `/orders/:id` | Detail order |
+
+### Pagination
+
+`GET /products` dan `GET /orders` menerima query `page` (default 1) dan `page_size` (default 20, maksimum 100 — nilai di luar batas dipangkas, nilai tidak valid jatuh ke default). Response menyertakan objek `meta`:
+
+```json
+{
+  "data": [ ... ],
+  "meta": { "page": 1, "page_size": 20, "total": 47, "total_pages": 3 }
+}
+```
 
 ### Contoh request/response
 
@@ -123,7 +134,6 @@ Validasi: `name` & `category_id` wajib, `price ≥ 0`, `stock ≥ 0`, `category_
 
 ## Known Limitations
 
-- Cart, checkout flow UI, dan halaman admin belum ada di frontend (rencana Hari 2).
-- Belum ada autentikasi — halaman admin terbuka (di luar scope requirement).
-- Belum ada pagination pada list produk/order.
-- Kategori hanya bisa dibaca (tidak ada CRUD kategori) — seeder yang mengisi.
+- Belum ada autentikasi — halaman admin (`/admin/products`, `/admin/orders`) terbuka tanpa login (di luar scope requirement).
+- Kategori hanya bisa dibaca (`GET /categories`) — tidak ada CRUD kategori, seeder yang mengisi.
+- Stok pada item cart adalah snapshot saat produk ditambahkan, bisa basi bila stok berubah di server; backend tetap sumber kebenaran saat checkout — bila ditolak (422 karena stok kurang), cart otomatis disinkronkan dengan stok terbaru dari server.

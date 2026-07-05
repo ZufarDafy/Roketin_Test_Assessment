@@ -53,10 +53,10 @@ const (
 	minSearchLen = 3
 )
 
-// List menangani search nama (ILIKE, didukung GIN trigram index) dan
-// filter kategori (B-tree index) sekaligus.
+// List menangani search nama (ILIKE, didukung GIN trigram index),
+// filter kategori (B-tree index), dan pagination.
 func (h *ProductHandler) List(c *gin.Context) {
-	q := h.DB.Preload("Category").Order("id")
+	q := h.DB.Model(&models.Product{})
 
 	if search := strings.TrimSpace(c.Query("search")); len(search) >= minSearchLen {
 		q = q.Where("name ILIKE ?", "%"+escapeLike.Replace(search)+"%")
@@ -65,12 +65,19 @@ func (h *ProductHandler) List(c *gin.Context) {
 		q = q.Where("category_id = ?", categoryID)
 	}
 
-	var products []models.Product
-	if err := q.Find(&products).Error; err != nil {
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch products"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": products})
+	page, pageSize, offset := parsePagination(c)
+
+	var products []models.Product
+	if err := q.Preload("Category").Order("id").Limit(pageSize).Offset(offset).Find(&products).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch products"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": products, "meta": buildPaginationMeta(page, pageSize, total)})
 }
 
 func (h *ProductHandler) Get(c *gin.Context) {
