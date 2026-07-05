@@ -2,6 +2,25 @@
 
 Aplikasi katalog produk + keranjang belanja sederhana (test case Fullstack Engineer Roketin). Client bisa melihat katalog, mencari & memfilter produk, menambah ke keranjang, dan checkout. Admin bisa mengelola produk (CRUD) dan melihat daftar order.
 
+## Arsitektur Sistem
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+graph TD
+    Client([Browser / Pengguna]) <-->|Interaksi UI & Tampilan| Frontend[Frontend: React + Vite]
+    Frontend <-->|REST API Request & Response| Backend[Backend: Go + Gin]
+    Backend <-->|SQL Query & Data Result| DB[(Database: PostgreSQL 16)]
+    
+    classDef clientNode fill:#111111,stroke:#555555,stroke-width:2px,color:#FFFFFF;
+    classDef frontendNode fill:#1A1A1A,stroke:#666666,stroke-width:2px,color:#FFFFFF;
+    classDef backendNode fill:#242424,stroke:#777777,stroke-width:2px,color:#FFFFFF;
+    classDef dbNode fill:#2E2E2E,stroke:#888888,stroke-width:2px,color:#FFFFFF;
+    
+    class Client clientNode;
+    class Frontend frontendNode;
+    class Backend backendNode;
+    class DB dbNode;
+```
+
 ## Tech Stack & Alasan
 
 | Layer | Teknologi | Alasan |
@@ -13,7 +32,7 @@ Aplikasi katalog produk + keranjang belanja sederhana (test case Fullstack Engin
 ### Catatan Desain selama Develop
 
 - **Uang sebagai `int64` rupiah utuh** — harga/subtotal/total disimpan dan dihitung sebagai integer (`BIGINT`), menghindari kemungkinan drift presisi floating point, ini sangat kritikal jika tidak diperhatikan karena akan membuat kesalahan kalkulasi.
-- **Validasi Stock** — Validasi sudah diterpakan pada code aplikasi Frontend maupun Backend, dan juga diterapkan pada Database dengan menambahkan `CHECK (stock >= 0)` dan `CHECK (price >= 0)` sebagai defense-in-depth; stok negatif ditolak database sendiri, tidak hanya oleh validasi aplikasi.
+- **Validasi Stock** — Validasi sudah diterapkan pada code aplikasi Frontend maupun Backend, dan juga diterapkan pada Database dengan menambahkan `CHECK (stock >= 0)` dan `CHECK (price >= 0)` sebagai defense-in-depth; stok negatif ditolak database sendiri, tidak hanya oleh validasi aplikasi.
 - **Stok opsional pada PUT produk** — bila field `stock` tidak dikirim, stok tidak disentuh. Sebelumnya AI Tools yang saya gunakan (Claude) membuat logika PUT produk dengan mengharuskan menambahkan stock sebagai parameter, namun secara logika saya pribadi jika perubahan produk dilakukan mengharuskan menambahkan stock sebagai parameter ada terdapat kemungkinan stock yang dimasukkan sudah berubah, sehingga Ini mencegah lost update: form edit yang menyimpan stok basi tidak menimpa hasil pengurangan stok dari checkout yang terjadi di sela-selanya. Update juga berjalan dalam transaction dengan row lock.
 - **Search & indexing** — saya meminta AI untuk menggunakan fitur trigram pada Postgres untuk fitur pencarian pada aplikasi, Sepengetahuan saya trigram ini dapat mengoptimalkan speed query database karena melakukan indexing pada kolom tabel (walaupun untuk saat ini mungkin speed tidak akan terlihat signifikan karena jumlah data yang sedikit, pada kasus yang saya temukan speed terasa signifikan di 50ribu data), misal nama produk akan diindexing dengna cara dipecah menjadi 3 huruf, sehingga database tidak perlu melakukan full sequential read, search nama memakai `ILIKE '%keyword%'` (leading wildcard) yang menggunakan (`pg_trgm`). Filter kategori memakai B-tree biasa; saat keduanya dipakai bersamaan planner menggabungkan lewat BitmapAnd. Dengan 10 produk seed planner tetap memilih seq scan (lebih murah di tabel kecil) — index ini keputusan desain untuk skala data nyata, terverifikasi terpakai via `EXPLAIN` dengan `enable_seqscan=off`.
 - **Optimasi Trigram** — Saya juga sudah menambahkan penyesuaian trigram ini pada frontend dan backend, dimana jika ingin melakukan search produk minimal input adalah 3 huruf, sehingga request ke backend dan query database akan berkurang.
